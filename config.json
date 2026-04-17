@@ -1,0 +1,41 @@
+{
+  "listen": "127.0.0.1:9000",
+  "upstream": "127.0.0.1:3000",
+  "policy": {
+    "mode": "allowlist",
+    "allowed_tools": [
+      "file_read",
+      "file_write",
+      "file_list",
+      "shell_exec",
+      "web_search"
+    ],
+    "blocked_paths": [
+      "/etc/",
+      "/root/",
+      "~/.ssh/",
+      "~/.aws/",
+      "~/.gnupg/",
+      "/proc/",
+      "/sys/"
+    ],
+    "blocked_patterns": [
+      "password",
+      "secret",
+      "token",
+      "api_key",
+      "private_key",
+      "BEGIN RSA",
+      "BEGIN OPENSSH"
+    ],
+    "rate_limit": {
+      "requests_per_second": 100,
+      "burst": 20
+    }
+  },
+  "audit": {
+    "enabled": true,
+    "path": "./veil-audit.log",
+    "max_size_mb": 10
+  }
+}
