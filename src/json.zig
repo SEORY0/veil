@@ -147,3 +147,90 @@ test "extract nested object" {
     try std.testing.expect(val != null);
     try std.testing.expect(std.mem.indexOf(u8, val.?, "/etc/passwd") != null);
 }
+
+// ── Fuzz tests ────────────────────────────────────────────
+//
+// Run with: `zig build test --fuzz`
+// Without --fuzz these only exercise the corpus (regression anchors).
+//
+// Guarantee being checked: the parser must not crash, hang, or read
+// out of bounds on *any* input. Valid parse results are unchecked —
+// we only verify memory-safety and termination.
+
+const fuzz_corpus = [_][]const u8{
+    // well-formed
+    "{\"method\":\"tools/call\",\"params\":{\"name\":\"x\",\"arguments\":{}}}",
+    "{\"method\":\"tools/list\"}",
+    // truncated / malformed
+    "",
+    "{",
+    "}",
+    "\"",
+    "{\"method\":\"",
+    "{\"method\":\"x",
+    "{\"method\":\"x\\",
+    "{\"method\":\"\\\\\\",
+    // unmatched braces
+    "{{{{{{{",
+    "}}}}}}}",
+    "{\"a\":{\"b\":{\"c\":{\"d\":{}}}}}",
+    // strings with embedded braces
+    "{\"name\":\"}}}\",\"method\":\"\"}",
+    "{\"name\":\"{{{\",\"method\":\"\"}",
+    // escape edge cases
+    "{\"name\":\"\\\"\",\"method\":\"\"}",
+    "{\"name\":\"a\\\\\\\"b\",\"method\":\"\"}",
+    // key substring confusion
+    "{\"methodx\":\"not-method\"}",
+    "{\"xmethod\":\"not-method\"}",
+    // non-JSON bytes
+    "\x00\x01\x02\x03",
+    "not json at all",
+};
+
+fn fuzzExtractToolCall(_: void, input: []const u8) anyerror!void {
+    _ = extractToolCall(input) catch {};
+    _ = extractStringValue(input, "\"method\"");
+    _ = extractStringValue(input, "\"name\"");
+    _ = extractObjectValue(input, "\"arguments\"");
+}
+
+test "fuzz: json parsers never crash on corpus" {
+    try std.testing.fuzz({}, fuzzExtractToolCall, .{ .corpus = &fuzz_corpus });
+}
+
+// Deterministic randomized property test. Complements the fixed corpus:
+// generates 10,000 random byte strings of varying lengths and feeds them
+// to every parser entry point. Any panic, OOB, or infinite loop fails the
+// test. Seeded — identical run every time so failures are reproducible.
+test "fuzz: json parsers survive 10k random inputs" {
+    var prng = std.Random.DefaultPrng.init(0xdeadbeef_cafe_f00d);
+    const r = prng.random();
+
+    var buf: [256]u8 = undefined;
+    var i: usize = 0;
+    while (i < 10_000) : (i += 1) {
+        const len = r.intRangeAtMost(usize, 0, buf.len);
+        r.bytes(buf[0..len]);
+        try fuzzExtractToolCall({}, buf[0..len]);
+    }
+}
+
+// Seeds randomness around structural landmarks (brace, quote, colon,
+// backslash, key strings) rather than uniformly — denser exploration of
+// the parse state transitions that matter.
+test "fuzz: json parsers survive 5k structured-random inputs" {
+    var prng = std.Random.DefaultPrng.init(0x12345678);
+    const r = prng.random();
+
+    const alphabet = "{}\"\\:,abc\"method\"\"name\"\"arguments\"\"params\"";
+    var buf: [512]u8 = undefined;
+    var i: usize = 0;
+    while (i < 5_000) : (i += 1) {
+        const len = r.intRangeAtMost(usize, 0, buf.len);
+        for (buf[0..len]) |*b| {
+            b.* = alphabet[r.intRangeLessThan(usize, 0, alphabet.len)];
+        }
+        try fuzzExtractToolCall({}, buf[0..len]);
+    }
+}

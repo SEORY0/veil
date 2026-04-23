@@ -103,15 +103,6 @@ Coming soon. Will compare against:
 - Envoy sidecar
 - nginx stream proxy
 
-## Research context
-
-veil is part of ongoing AI agent security research at Soongsil University AI Safety Research Center (ASC). It demonstrates that security layers for MCP/Agent communication can be added with near-zero performance cost when built from scratch with minimal trusted computing base.
-
-Related work:
-- [KIISC 2025] AI/ML vulnerability classification using source-to-sink analysis
-- FIGS framework (Fine-grained Authorization, Identity, Guardrails, Sandboxing)
-- CVE hunting on OpenClaw, vLLM, HuggingFace ecosystems
-
 ## License
 
 MIT
