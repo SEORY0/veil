@@ -65,7 +65,7 @@ test "rate limiter refills over time" {
     try std.testing.expect(!rl.tryConsume());
 
     // Wait a bit for refill
-    std.time.sleep(2_000_000); // 2ms = should refill ~2 tokens at 1000/s
+    std.Thread.sleep(2_000_000); // 2ms = should refill ~2 tokens at 1000/s
     try std.testing.expect(rl.tryConsume());
 }
 
